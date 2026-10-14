@@ -1,11 +1,14 @@
 package main
 
 import (
+	"database/sql"
 	"fmt"
 	"log"
 	"os"
 
 	"github.com/jnsanders1983/blog-aggregator/internal/config"
+	"github.com/jnsanders1983/blog-aggregator/internal/database"
+	_ "github.com/lib/pq"
 )
 
 func main() {
@@ -14,17 +17,25 @@ func main() {
 		log.Fatalf("error reading config: %v", err)
 	}
 
-	s := state{
-		c: &cfg,
+	db, err := sql.Open("postgres", cfg.DataBaseURL)
+	if err != nil {
+		log.Fatalf("error opening database: %v", err)
 	}
+	defer db.Close()
 
-	fmt.Printf("%+v\n", *s.c)
+	dbQueries := database.New(db)
+
+	s := state{
+		c:  &cfg,
+		db: dbQueries,
+	}
 
 	cmds := commands{
 		commandHandler: make(map[string]func(*state, command) error),
 	}
 
 	cmds.register("login", handlerLogin)
+	cmds.register("register", handlerRegister)
 
 	if len(os.Args) < 2 {
 		fmt.Fprintln(os.Stderr, "a command is required")
