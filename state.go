@@ -94,3 +94,37 @@ func handlerRegister(s *state, cmd command) error {
 	fmt.Printf("%+v\n", user)
 	return nil
 }
+
+func handlerReset(s *state, cmd command) error {
+	if len(cmd.args) != 0 {
+		return fmt.Errorf("reset does not accept arguments")
+	}
+
+	if err := s.db.ResetUsers(context.Background()); err != nil {
+		return fmt.Errorf("reset users: %w", err)
+	}
+
+	fmt.Println("All users were deleted successfully.")
+	return nil
+}
+
+func handlerUsers(s *state, cmd command) error {
+	if len(cmd.args) != 0 {
+		return fmt.Errorf("users does not accept arguments")
+	}
+
+	users, err := s.db.GetUsers(context.Background())
+	if err != nil {
+		return fmt.Errorf("get users: %w", err)
+	}
+
+	for _, user := range users {
+		if user.Name == s.c.CurrentUserName {
+			fmt.Printf("* %s (current)\n", user.Name)
+		} else {
+			fmt.Printf("* %s\n", user.Name)
+		}
+	}
+
+	return nil
+}
