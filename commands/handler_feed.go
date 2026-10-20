@@ -38,3 +38,27 @@ func addfeed(s *State, cmd Command) error {
 	fmt.Printf("Name: %s\n", feed.Name)
 	return nil
 }
+
+func feeds(s *State, cmd Command) error {
+	if len(cmd.Args) != 0 {
+		return fmt.Errorf("feeds has no arguements")
+	}
+	ctx := context.Background()
+
+	feeds, err := s.db.GetFeeds(ctx)
+	if err != nil {
+		return err
+	}
+
+	for _, feed := range feeds {
+		name := feed.Name
+		url := feed.Url
+		user, err := s.db.GetUserById(ctx, feed.UserID)
+		if err != nil {
+			return err
+		}
+		fmt.Printf("Name: %s, Url: %s, Creator:%s\n", name, url, user.Name)
+	}
+
+	return nil
+}

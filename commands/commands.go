@@ -21,6 +21,7 @@ func New() *Commands {
 	cmds.register("users", handlerUsers)
 	cmds.register("agg", handlerAgg)
 	cmds.register("addfeed", addfeed)
+	cmds.register("feeds", feeds)
 	return cmds
 }
 
