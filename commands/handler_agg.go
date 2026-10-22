@@ -2,8 +2,15 @@ package commands
 
 import (
 	"context"
+	"database/sql"
+	"errors"
 	"fmt"
+	"strings"
 	"time"
+
+	"github.com/google/uuid"
+	"github.com/jnsanders1983/blog-aggregator/internal/database"
+	"github.com/lib/pq"
 )
 
 func handlerAgg(s *State, cmd Command) error {
@@ -49,8 +56,54 @@ func scrapeFeeds(s *State) {
 		return
 	}
 
+	saved := 0
 	for _, item := range rssFeed.Channel.Item {
-		fmt.Printf("* %s\n", item.Title)
+		now := time.Now()
+		_, err := s.db.CreatePost(ctx, database.CreatePostParams{
+			ID:          uuid.New(),
+			CreatedAt:   now,
+			UpdatedAt:   now,
+			Title:       item.Title,
+			Url:         item.Link,
+			Description: sql.NullString{String: item.Description, Valid: item.Description != ""},
+			PublishedAt: parsePublishedAt(item.PubDate),
+			FeedID:      feed.ID,
+		})
+		if err != nil {
+			var pqErr *pq.Error
+			if errors.As(err, &pqErr) && pqErr.Code == "23505" {
+				continue
+			}
+			fmt.Printf("couldn't save post %q: %v\n", item.Link, err)
+			continue
+		}
+		saved++
 	}
-	fmt.Printf("Feed %s: %d posts\n", feed.Name, len(rssFeed.Channel.Item))
+	fmt.Printf("Feed %s: %d new posts (%d total)\n", feed.Name, saved, len(rssFeed.Channel.Item))
+}
+
+var pubDateLayouts = []string{
+	time.RFC1123Z,
+	time.RFC1123,
+	time.RFC822Z,
+	time.RFC822,
+	time.RFC3339,
+	time.RFC3339Nano,
+	"Mon, 2 Jan 2006 15:04:05 -0700",
+	"Mon, 2 Jan 2006 15:04:05 MST",
+	"2006-01-02 15:04:05",
+	"2006-01-02",
+}
+
+func parsePublishedAt(s string) sql.NullTime {
+	s = strings.TrimSpace(s)
+	if s == "" {
+		return sql.NullTime{}
+	}
+	for _, layout := range pubDateLayouts {
+		if t, err := time.Parse(layout, s); err == nil {
+			return sql.NullTime{Time: t, Valid: true}
+		}
+	}
+	return sql.NullTime{}
 }
