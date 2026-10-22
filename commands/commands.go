@@ -1,6 +1,11 @@
 package commands
 
-import "fmt"
+import (
+	"context"
+	"fmt"
+
+	"github.com/jnsanders1983/blog-aggregator/internal/database"
+)
 
 type Command struct {
 	Name string
@@ -9,6 +14,17 @@ type Command struct {
 
 type Commands struct {
 	commandHandler map[string]func(*State, Command) error
+}
+
+func middlewareLoggedIn(handler func(s *State, cmd Command, user database.User) error) func(*State, Command) error {
+	return func(s *State, cmd Command) error {
+		user, err := s.db.GetUser(context.Background(), s.c.CurrentUserName)
+		if err != nil {
+			return err
+		}
+
+		return handler(s, cmd, user)
+	}
 }
 
 func New() *Commands {
@@ -20,10 +36,11 @@ func New() *Commands {
 	cmds.register("reset", handlerReset)
 	cmds.register("users", handlerUsers)
 	cmds.register("agg", handlerAgg)
-	cmds.register("addfeed", addfeed)
+	cmds.register("addfeed", middlewareLoggedIn(addfeed))
 	cmds.register("feeds", feeds)
-	cmds.register("follow", follow)
-	cmds.register("following", following)
+	cmds.register("follow", middlewareLoggedIn(follow))
+	cmds.register("following", middlewareLoggedIn(following))
+	cmds.register("unfollow", middlewareLoggedIn(unfollow))
 	return cmds
 }
 

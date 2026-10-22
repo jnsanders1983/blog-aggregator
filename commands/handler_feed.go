@@ -9,16 +9,9 @@ import (
 	"github.com/jnsanders1983/blog-aggregator/internal/database"
 )
 
-func addfeed(s *State, cmd Command) error {
+func addfeed(s *State, cmd Command, user database.User) error {
 	if len(cmd.Args) != 2 {
 		return fmt.Errorf("addfeed requires name and url")
-	}
-	ctx := context.Background()
-	name := s.c.CurrentUserName
-
-	user, err := s.db.GetUser(ctx, name)
-	if err != nil {
-		return err
 	}
 
 	now := time.Now()
@@ -31,7 +24,7 @@ func addfeed(s *State, cmd Command) error {
 		Url:       cmd.Args[1],
 		UserID:    user.ID,
 	}
-	feed, err := s.db.CreateFeed(ctx, params)
+	feed, err := s.db.CreateFeed(context.Background(), params)
 	if err != nil {
 		return err
 	}
@@ -45,7 +38,7 @@ func addfeed(s *State, cmd Command) error {
 		FeedID:    feed.ID,
 	}
 
-	feed_follow_row, err := s.db.CreateFeedFollow(ctx, feed_follow)
+	feed_follow_row, err := s.db.CreateFeedFollow(context.Background(), feed_follow)
 	if err != nil {
 		return err
 	}
@@ -77,24 +70,17 @@ func feeds(s *State, cmd Command) error {
 	return nil
 }
 
-func follow(s *State, cmd Command) error {
+func follow(s *State, cmd Command, user database.User) error {
 	if len(cmd.Args) != 1 {
 		return fmt.Errorf("follow takes exactly one argument, a url")
 	}
 	url := cmd.Args[0]
-	ctx := context.Background()
 
-	feed, err := s.db.GetFeedByURL(ctx, url)
+	feed, err := s.db.GetFeedByURL(context.Background(), url)
 	if err != nil {
 		return err
 	}
 	fmt.Printf("Name: %s\n", feed.Name)
-
-	name := s.c.CurrentUserName
-	user, err := s.db.GetUser(ctx, name)
-	if err != nil {
-		return err
-	}
 
 	now := time.Now()
 	feed_follow := database.CreateFeedFollowParams{
@@ -105,7 +91,7 @@ func follow(s *State, cmd Command) error {
 		FeedID:    feed.ID,
 	}
 
-	feed_follow_row, err := s.db.CreateFeedFollow(ctx, feed_follow)
+	feed_follow_row, err := s.db.CreateFeedFollow(context.Background(), feed_follow)
 	if err != nil {
 		return err
 	}
@@ -114,17 +100,28 @@ func follow(s *State, cmd Command) error {
 	return nil
 }
 
-func following(s *State, cmd Command) error {
-	if len(cmd.Args) != 0 {
-		return fmt.Errorf("following takes zeor arguments")
+func unfollow(s *State, cmd Command, user database.User) error {
+	if len(cmd.Args) != 1 {
+		return fmt.Errorf("unfollow takes exactly one argument, a url")
 	}
-	name := s.c.CurrentUserName
-	ctx := context.Background()
-	user, err := s.db.GetUser(ctx, name)
+	url := cmd.Args[0]
+	feed, err := s.db.GetFeedByURL(context.Background(), url)
 	if err != nil {
 		return err
 	}
-	user_feed_follows, err := s.db.GetFeedFollowsForUser(ctx, user.ID)
+	remove_feed := database.DeleteFeedFollowParams{
+		UserID: user.ID,
+		FeedID: feed.ID,
+	}
+	return s.db.DeleteFeedFollow(context.Background(), remove_feed)
+}
+
+func following(s *State, cmd Command, user database.User) error {
+	if len(cmd.Args) != 0 {
+		return fmt.Errorf("following takes zeor arguments")
+	}
+
+	user_feed_follows, err := s.db.GetFeedFollowsForUser(context.Background(), user.ID)
 	if err != nil {
 		return err
 	}
